@@ -5,7 +5,6 @@
 
 html {
     font-family: serif;
-    color: CanvasText;
 }
 
 body {
@@ -57,12 +56,7 @@ button, input[type=submit], input[type=button], input[type=reset], select, ::fil
 }
 
 button:disabled, input[type=submit]:disabled, input[type=button]:disabled, input[type=reset]:disabled, select:disabled {
-    /* FIXME: There isn't a <system-color> keyword for this, so this is a slightly lightened
-     *        version of our light ButtonFace color. Once we support `color-scheme: dark`
-     *        we'll need to use a different color for that.
-     */
-    background-color: #e5e0d7;
-    color: GrayText;
+    filter: contrast(50%);
 }
 
 input[type=image] {
@@ -70,11 +64,8 @@ input[type=image] {
 }
 
 button:hover, input[type=submit]:hover, input[type=button]:hover, input[type=reset]:hover, select:hover {
-    /* FIXME: There isn't a <system-color> keyword for this, so this is a slightly lightened
-     *        version of our light ButtonFace color. Once we support `color-scheme: dark`
-     *        we'll need to use a different color for that.
-     */
-    background-color: #e5e0d7;
+    /* FIXME: Filters don't currently do anything in :hover styles
+                filter: contrast(50%); */
 }
 
 option {
@@ -95,7 +86,7 @@ input[type=range]::-webkit-slider-runnable-track {
     height: 4px;
     width: 100%;
     margin-top: 6px;
-    background-color: Background;
+    background-color: AccentColorText;
     border: 1px solid rgba(0, 0, 0, 0.5);
 }
 input[type=range]::-webkit-slider-thumb {
@@ -143,7 +134,7 @@ progress::-webkit-progress-bar, progress::-webkit-progress-value {
     height: 100%;
 }
 progress::-webkit-progress-bar {
-    background-color: Background;
+    background-color: AccentColorText;
     border: 1px solid rgba(0, 0, 0, 0.5);
 }
 
@@ -862,6 +853,8 @@ progress {
 /* https://github.com/whatwg/html/pull/9546
  */
 input[type=checkbox][switch] {
+    /* FIXME: Workaround until we can properly style dark switches */
+    color-scheme: light;
 	appearance: none;
 	height: 1em;
 	width: 1.8em;
