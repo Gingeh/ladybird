@@ -12,6 +12,7 @@
 #include <LibWeb/CSS/Parser/ParsingContext.h>
 #include <LibWeb/CSS/PropertyID.h>
 #include <LibWeb/CSS/StyleValues/CSSColorValue.h>
+#include <LibWeb/CSS/StyleValues/ColorSchemeStyleValue.h>
 #include <LibWeb/DOM/Document.h>
 #include <LibWeb/HTML/HTMLMetaElement.h>
 #include <LibWeb/Infra/CharacterTypes.h>
@@ -83,6 +84,28 @@ void HTMLMetaElement::inserted()
         document().page().client().page_did_change_theme_color(color);
         return;
     }
+    // https://html.spec.whatwg.org/multipage/semantics.html#meta-color-scheme
+    // To obtain a page's supported color-schemes, user agents must run the following steps:
+    // 1. Let candidate elements be the list of all meta elements that meet the following criteria, in tree order:
+    //     * The element is in a document tree;
+    //     * The element has a name attribute, whose value is an ASCII case-insensitive match for color-scheme; and
+    //     * The element has a content attribute.
+    if (name().has_value() && name()->equals_ignoring_ascii_case("color-scheme"sv) && content.has_value()) {
+        auto context = CSS::Parser::ParsingContext { document() };
+
+        // 2. For each element in candidate elements:
+        //     1. Let parsed be the result of parsing a list of component values given the value of element's content attribute.
+        auto parsed = parse_css_value(context, content.value(), CSS::PropertyID::ColorScheme);
+        //     2. If parsed is a valid CSS 'color-scheme' property value, then return parsed.
+        if (parsed.is_null() || !parsed->is_color_scheme())
+            return;
+
+        document().set_supported_color_schemes(parsed->as_color_scheme().schemes());
+        return;
+    }
+
+    // FIXME: If any meta elements are inserted into the document or removed from the document,
+    //        or existing meta elements have their name or content attributes changed, user agents must re-run the above algorithm.
 
     // https://html.spec.whatwg.org/multipage/semantics.html#pragma-directives
     // When a meta element is inserted into the document, if its http-equiv attribute is present and represents one of

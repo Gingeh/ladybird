@@ -241,6 +241,9 @@ public:
     Optional<Color> visited_link_color() const;
     void set_visited_link_color(Color);
 
+    Optional<Vector<String> const&> supported_color_schemes() const;
+    void set_supported_color_schemes(Vector<String>);
+
     void update_style();
     void update_layout();
     void update_paint_and_hit_testing_properties_if_needed();
@@ -826,6 +829,8 @@ private:
     Optional<Color> m_normal_link_color;
     Optional<Color> m_active_link_color;
     Optional<Color> m_visited_link_color;
+
+    Optional<Vector<String>> m_supported_color_schemes;
 
     GC::Ptr<HTML::HTMLParser> m_parser;
     bool m_active_parser_was_aborted { false };

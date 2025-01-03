@@ -1430,6 +1430,17 @@ void Document::set_visited_link_color(Color color)
     m_visited_link_color = color;
 }
 
+Optional<Vector<String> const&> Document::supported_color_schemes() const
+{
+    return m_supported_color_schemes;
+}
+
+void Document::set_supported_color_schemes(Vector<String> color_schemes)
+{
+    if (!m_supported_color_schemes.has_value())
+        m_supported_color_schemes = color_schemes;
+}
+
 Layout::Viewport const* Document::layout_node() const
 {
     return static_cast<Layout::Viewport const*>(Node::layout_node());
