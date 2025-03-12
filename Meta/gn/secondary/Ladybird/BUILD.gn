@@ -272,6 +272,7 @@ web_resources = [
 about_pages = [
   "//Base/res/ladybird/about-pages/about.html",
   "//Base/res/ladybird/about-pages/newtab.html",
+  "//Base/res/ladybird/about-pages/serenity.html",
 ]
 
 web_templates = [
