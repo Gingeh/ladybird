@@ -69,6 +69,7 @@ set(WEB_RESOURCES
 set(ABOUT_PAGES
     about.html
     newtab.html
+    serenity.html
 )
 set(WEB_TEMPLATES
     directory.html
