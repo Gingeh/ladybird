@@ -33,6 +33,8 @@ public:
     void close(Optional<String> return_value);
     void request_close(Optional<String> return_value);
 
+    static void light_dismiss_open_dialogs(UIEvents::PointerEvent&, GC::Ptr<DOM::Node>);
+
     // https://www.w3.org/TR/html-aria/#el-dialog
     virtual Optional<ARIA::Role> default_role() const override { return ARIA::Role::dialog; }
 

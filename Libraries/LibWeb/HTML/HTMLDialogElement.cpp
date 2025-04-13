@@ -17,6 +17,7 @@
 #include <LibWeb/HTML/HTMLDialogElement.h>
 #include <LibWeb/HTML/ToggleEvent.h>
 #include <LibWeb/HTML/TraversableNavigable.h>
+#include <LibWeb/UIEvents/PointerEvent.h>
 
 namespace Web::HTML {
 
@@ -131,8 +132,12 @@ WebIDL::ExceptionOr<void> HTMLDialogElement::show()
     // 6. Add an open attribute to this, whose value is the empty string.
     TRY(set_attribute(AttributeNames::open, {}));
 
-    // FIXME: 7. Assert: this's node document's open dialogs list does not contain this.
-    // FIXME: 8. Add this to this's node document's open dialogs list.
+    // 7. Assert: this's node document's open dialogs list does not contain this.
+    VERIFY(!m_document->open_dialogs_list().contains_slow(GC::Ref(*this)));
+
+    // 8. Add this to this's node document's open dialogs list.
+    m_document->open_dialogs_list().append(*this);
+
     // 9. Set the dialog close watcher with this.
     set_close_watcher();
     // FIXME: 10. Set this's previously focused element to the focused element.
@@ -225,8 +230,12 @@ WebIDL::ExceptionOr<void> HTMLDialogElement::show_a_modal_dialog(HTMLDialogEleme
     // 12. Set is modal of subject to true.
     subject.m_is_modal = true;
 
-    // FIXME: 13. Assert: subject's node document's open dialogs list does not contain subject.
-    // FIXME: 14. Add subject to subject's node document's open dialogs list.
+    // 13. Assert: subject's node document's open dialogs list does not contain subject.
+    VERIFY(!subject.document().open_dialogs_list().contains_slow(GC::Ref(subject)));
+
+    // 14. Add subject to subject's node document's open dialogs list.
+    subject.document().open_dialogs_list().append(subject);
+
     // FIXME: 15. Let subject's node document be blocked by the modal dialog subject.
 
     // 16. If subject's node document's top layer does not already contain subject, then add an element to the top layer given subject.
@@ -340,7 +349,8 @@ void HTMLDialogElement::close_the_dialog(Optional<String> result)
     // 8. Set the is modal flag of subject to false.
     m_is_modal = false;
 
-    // FIXME: 9. Remove subject from subject's node document's open dialogs list.
+    // 9. Remove subject from subject's node document's open dialogs list.
+    document().open_dialogs_list().remove_first_matching([this](auto other) { return other == this; });
 
     // 10. If result is not null, then set the returnValue attribute to result.
     if (result.has_value())
@@ -433,6 +443,46 @@ void HTMLDialogElement::run_dialog_focusing_steps()
 
     // FIXME: 9. Empty topDocument's autofocus candidates.
     // FIXME: 10. Set topDocument's autofocus processed flag to true.
+}
+
+// https://html.spec.whatwg.org/multipage/interactive-elements.html#light-dismiss-open-dialogs
+void HTMLDialogElement::light_dismiss_open_dialogs(UIEvents::PointerEvent& event, GC::Ptr<DOM::Node> target)
+{
+    // To light dismiss open dialogs, given a PointerEvent event:
+
+    // 1. Assert: event's isTrusted attribute is true.
+    VERIFY(event.is_trusted());
+
+    // 2. Let document be event's target's node document.
+    auto& document = target->document();
+
+    // 3. If document's open dialogs list is empty, then return.
+    if (document.open_dialogs_list().is_empty())
+        return;
+
+    // FIXME: 4. Let ancestor be the result of running nearest clicked dialog given event.
+
+    // 5. If event's type is "pointerdown", then set document's dialog pointerdown target to ancestor.
+    // if (event.type() == UIEvents::EventNames::pointerdown)
+    //     document.set_dialog_pointerdown_target(ancestor);
+
+    // 6. If event's type is "pointerup", then:
+
+    //    1. Let sameTarget be true if ancestor is document's dialog pointerdown target.
+
+    //    2. Set document's dialog pointerdown target to null.
+
+    //    3. If sameTarget is false, then return.
+
+    //    4. Let topmostDialog be the last element of document's open dialogs list.
+
+    //    5. If ancestor is topmostDialog, then return.
+
+    //    6. If topmostDialog's computed closed-by state is not Any, then return.
+
+    //    7. Assert: topmostDialog's close watcher is not null.
+
+    //    8. Request to close topmostDialog's close watcher with false.
 }
 
 }
