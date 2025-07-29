@@ -11,12 +11,25 @@
 #include <LibWeb/CSS/StyleValues/CalculatedStyleValue.h>
 #include <LibWeb/CSS/StyleValues/NumberStyleValue.h>
 #include <LibWeb/CSS/StyleValues/PercentageStyleValue.h>
+#include <LibWeb/Layout/Node.h>
 
 namespace Web::CSS {
 
-Optional<Color> CSSRGB::to_color(Optional<Layout::NodeWithStyle const&>, CalculationResolutionContext const& resolution_context) const
+Optional<Color> CSSRGB::to_color(Optional<Layout::NodeWithStyle const&> node, CalculationResolutionContext const& resolution_context) const
 {
-    auto resolve_rgb_to_u8 = [&resolution_context](CSSStyleValue const& style_value) -> Optional<u8> {
+    auto component_resolution_context = resolution_context;
+    if (m_properties.origin) {
+        auto resolved_origin = m_properties.origin->to_color(node, resolution_context);
+        if (!resolved_origin.has_value())
+            return {};
+
+        component_resolution_context.resolved_keyword_values.set(Keyword::R, (double)resolved_origin->red());
+        component_resolution_context.resolved_keyword_values.set(Keyword::G, (double)resolved_origin->green());
+        component_resolution_context.resolved_keyword_values.set(Keyword::B, (double)resolved_origin->blue());
+        component_resolution_context.resolved_keyword_values.set(Keyword::Alpha, ((double)resolved_origin->alpha()) / 255.0);
+    }
+
+    auto resolve_rgb_to_u8 = [&component_resolution_context](CSSStyleValue const& style_value) -> Optional<u8> {
         // <number> | <percentage> | none
         auto normalized = [](double number) {
             if (isnan(number))
@@ -33,7 +46,7 @@ Optional<Color> CSSRGB::to_color(Optional<Layout::NodeWithStyle const&>, Calcula
         if (style_value.is_calculated()) {
             auto const& calculated = style_value.as_calculated();
             if (calculated.resolves_to_number()) {
-                auto maybe_number = calculated.resolve_number(resolution_context);
+                auto maybe_number = calculated.resolve_number(component_resolution_context);
 
                 if (!maybe_number.has_value())
                     return {};
@@ -42,7 +55,7 @@ Optional<Color> CSSRGB::to_color(Optional<Layout::NodeWithStyle const&>, Calcula
             }
 
             if (calculated.resolves_to_percentage()) {
-                auto maybe_percentage = calculated.resolve_percentage(resolution_context);
+                auto maybe_percentage = calculated.resolve_percentage(component_resolution_context);
 
                 if (!maybe_percentage.has_value())
                     return {};
@@ -51,11 +64,23 @@ Optional<Color> CSSRGB::to_color(Optional<Layout::NodeWithStyle const&>, Calcula
             }
         }
 
+        if (style_value.is_keyword()) {
+            if (style_value.to_keyword() == Keyword::None)
+                return 0;
+
+            auto maybe_number = component_resolution_context.resolved_keyword_values.get(style_value.to_keyword());
+
+            if (!maybe_number.has_value())
+                return {};
+
+            return normalized(maybe_number.value());
+        }
+
         return 0;
     };
 
-    auto resolve_alpha_to_u8 = [&resolution_context](CSSStyleValue const& style_value) -> Optional<u8> {
-        auto alpha_0_1 = resolve_alpha(style_value, resolution_context);
+    auto resolve_alpha_to_u8 = [&component_resolution_context](CSSStyleValue const& style_value) -> Optional<u8> {
+        auto alpha_0_1 = resolve_alpha(style_value, component_resolution_context);
         if (alpha_0_1.has_value())
             return llround(clamp(alpha_0_1.value() * 255.0f, 0.0f, 255.0f));
         return {};
@@ -86,8 +111,29 @@ bool CSSRGB::equals(CSSStyleValue const& other) const
 // https://www.w3.org/TR/css-color-4/#serializing-sRGB-values
 String CSSRGB::to_string(SerializationMode mode) const
 {
-    if (mode != SerializationMode::ResolvedValue && m_properties.name.has_value())
-        return m_properties.name.value().to_string().to_ascii_lowercase();
+    if (mode == SerializationMode::Normal) {
+        if (m_properties.name.has_value())
+            return m_properties.name.value().to_string().to_ascii_lowercase();
+
+        if (m_properties.origin) {
+            StringBuilder builder;
+            builder.append("rgb(from "sv);
+            builder.append(m_properties.origin->to_string(mode));
+            builder.append(" "sv);
+            builder.append(m_properties.r->to_string(mode));
+            builder.append(" "sv);
+            builder.append(m_properties.g->to_string(mode));
+            builder.append(" "sv);
+            builder.append(m_properties.b->to_string(mode));
+            if ((!m_properties.alpha->is_number() || m_properties.alpha->as_number().number() < 1) && (!m_properties.alpha->is_percentage() || m_properties.alpha->as_percentage().percentage().as_fraction() < 1)) {
+                builder.append(" / "sv);
+                builder.append(m_properties.alpha->to_string(mode));
+            }
+            builder.append(")"sv);
+
+            return builder.to_string_without_validation();
+        }
+    }
 
     if (auto color = to_color({}, {}); color.has_value())
         return serialize_a_srgb_value(color.value());

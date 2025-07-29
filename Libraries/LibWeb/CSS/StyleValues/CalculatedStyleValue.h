@@ -10,6 +10,7 @@
 #pragma once
 
 #include <AK/Function.h>
+#include <AK/HashMap.h>
 #include <LibWeb/CSS/Angle.h>
 #include <LibWeb/CSS/CSSNumericType.h>
 #include <LibWeb/CSS/CSSStyleValue.h>
@@ -29,12 +30,14 @@ class CalculationNode;
 // Contains the context available at parse-time.
 struct CalculationContext {
     Optional<ValueType> percentages_resolve_as {};
+    Vector<Keyword> component_keywords {};
     bool resolve_numbers_as_integers = false;
 };
 // Contains the context for resolving the calculation.
 struct CalculationResolutionContext {
     Variant<Empty, Angle, Frequency, Length, Time> percentage_basis {};
     Optional<Length::ResolutionContext> length_resolution_context;
+    HashMap<Keyword, double> resolved_keyword_values {};
 };
 
 class CalculatedStyleValue : public CSSStyleValue {
@@ -142,6 +145,7 @@ class CalculationNode : public RefCounted<CalculationNode> {
 public:
     enum class Type {
         Numeric,
+        Keyword,
         // NOTE: Currently, any value with a `var()` or `attr()` function in it is always an
         //       UnresolvedStyleValue so we do not have to implement a NonMathFunction type here.
 
@@ -289,6 +293,28 @@ public:
 private:
     NumericCalculationNode(NumericValue, CSSNumericType);
     NumericValue m_value;
+};
+
+class KeywordCalculationNode final : public CalculationNode {
+public:
+    static NonnullRefPtr<KeywordCalculationNode const> create(Keyword, CalculationContext const&);
+    ~KeywordCalculationNode();
+
+    virtual bool contains_percentage() const override;
+    virtual CalculatedStyleValue::CalculationResult resolve(CalculationResolutionContext const&) const override;
+    virtual NonnullRefPtr<CalculationNode const> with_simplified_children(CalculationContext const&, CalculationResolutionContext const&) const override { return *this; }
+
+    virtual Vector<NonnullRefPtr<CalculationNode const>> children() const override { return {}; }
+
+    virtual void dump(StringBuilder&, int indent) const override;
+    virtual bool equals(CalculationNode const&) const override;
+
+    Keyword const& keyword() const { return m_keyword; }
+    String keyword_to_string() const { return MUST(String::from_utf8(string_from_keyword(m_keyword))); }
+
+private:
+    KeywordCalculationNode(Keyword);
+    Keyword m_keyword;
 };
 
 class SumCalculationNode final : public CalculationNode {

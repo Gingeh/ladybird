@@ -194,7 +194,7 @@ static String serialize_a_math_function(CalculationNode const& fn, CalculationCo
     //    Otherwise, let s be a string initially containing the name of the root node, lowercased (such as "sin" or
     //    "max"), followed by a "(" (open parenthesis).
     StringBuilder builder;
-    if (fn.type() == CalculationNode::Type::Numeric || fn.is_calc_operator_node()) {
+    if (fn.type() == CalculationNode::Type::Numeric || fn.type() == CalculationNode::Type::Keyword || fn.is_calc_operator_node()) {
         builder.append("calc("sv);
     } else {
         builder.appendff("{}(", fn.name());
@@ -217,7 +217,7 @@ static String serialize_a_math_function(CalculationNode const& fn, CalculationCo
     //             The three AD-HOCs in this step are mentioned there.
     // AD-HOC: Numeric nodes have no children and should serialize directly.
     // AD-HOC: calc-operator nodes should also serialize directly, instead of separating their children by commas.#
-    if (fn.type() == CalculationNode::Type::Numeric || fn.is_calc_operator_node()) {
+    if (fn.type() == CalculationNode::Type::Numeric || fn.type() == CalculationNode::Type::Keyword || fn.is_calc_operator_node()) {
         builder.append(serialized_tree_without_parentheses(fn));
     } else {
         Vector<String> serialized_children;
@@ -320,6 +320,8 @@ static String serialize_a_calculation_tree(CalculationNode const& root, Calculat
     // FIXME: Support non-math functions in calculation trees.
     if (root.type() == CalculationNode::Type::Numeric)
         return static_cast<NumericCalculationNode const&>(root).value_to_string();
+    if (root.type() == CalculationNode::Type::Keyword)
+        return static_cast<KeywordCalculationNode const&>(root).keyword_to_string();
 
     // 3. If root is anything but a Sum, Negate, Product, or Invert node, serialize a math function for the function
     //    corresponding to the node type, treating the node’s children as the function’s comma-separated calculation
@@ -482,6 +484,7 @@ StringView CalculationNode::name() const
     case Type::Rem:
         return "rem"sv;
     case Type::Numeric:
+    case Type::Keyword:
     case Type::Sum:
     case Type::Product:
     case Type::Negate:
@@ -740,6 +743,45 @@ bool NumericCalculationNode::equals(CalculationNode const& other) const
     if (type() != other.type())
         return false;
     return m_value == static_cast<NumericCalculationNode const&>(other).m_value;
+}
+
+NonnullRefPtr<KeywordCalculationNode const> KeywordCalculationNode::create(Keyword keyword, CalculationContext const&)
+{
+    return adopt_ref(*new (nothrow) KeywordCalculationNode(keyword));
+}
+
+KeywordCalculationNode::KeywordCalculationNode(Keyword keyword)
+    : CalculationNode(Type::Keyword, CSSNumericType {})
+    , m_keyword(keyword)
+{
+}
+
+KeywordCalculationNode::~KeywordCalculationNode() = default;
+
+bool KeywordCalculationNode::contains_percentage() const
+{
+    return false;
+}
+
+CalculatedStyleValue::CalculationResult KeywordCalculationNode::resolve(CalculationResolutionContext const& context) const
+{
+    auto value = context.resolved_keyword_values.get(m_keyword);
+    VERIFY(value.has_value());
+    return CalculatedStyleValue::CalculationResult(*value, CSSNumericType {});
+}
+
+void KeywordCalculationNode::dump(StringBuilder& builder, int indent) const
+{
+    builder.appendff("{: >{}}KEYWORD({})\n", "", indent, string_from_keyword(m_keyword));
+}
+
+bool KeywordCalculationNode::equals(CalculationNode const& other) const
+{
+    if (this == &other)
+        return true;
+    if (type() != other.type())
+        return false;
+    return m_keyword == static_cast<KeywordCalculationNode const&>(other).m_keyword;
 }
 
 NonnullRefPtr<SumCalculationNode const> SumCalculationNode::create(Vector<NonnullRefPtr<CalculationNode const>> values)
@@ -3048,7 +3090,15 @@ NonnullRefPtr<CalculationNode const> simplify_a_calculation_tree(CalculationNode
     }
 
     // 2. If root is any other leaf node (not an operator node):
-    // FIXME: We don't yet allow any of these inside a calculation tree. Revisit once we do.
+    if (root->type() == CalculationNode::Type::Keyword) {
+        auto const& root_keyword = as<KeywordCalculationNode>(*root);
+        // 1. If there is enough information available to determine its numeric value, return its value, expressed in the value’s canonical unit.
+        if (resolution_context.resolved_keyword_values.contains(root_keyword.keyword())) {
+            return NumericCalculationNode::create(Number(Number::Type::Number, resolution_context.resolved_keyword_values.get(root_keyword.keyword()).value()), context);
+        }
+        // 2. Otherwise, return root.
+        return root;
+    }
 
     // 3. At this point, root is an operator node. Simplify all the calculation children of root.
     root = root->with_simplified_children(context, resolution_context);

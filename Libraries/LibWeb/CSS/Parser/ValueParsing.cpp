@@ -744,6 +744,15 @@ RefPtr<CSSStyleValue const> Parser::parse_number_value(TokenStream<ComponentValu
         tokens.discard_a_token(); // calc
         return calc;
     }
+    auto maybe_relative_color_context = m_value_context.last_matching([](ValueParsingContext const& context) { return context.has<RelativeColorContext>(); });
+    if (maybe_relative_color_context.has_value()) {
+        auto transaction = tokens.begin_transaction();
+        auto maybe_keyword = parse_keyword_value(tokens);
+        if (maybe_keyword && maybe_relative_color_context->get<RelativeColorContext>().component_keywords.contains_slow(maybe_keyword->to_keyword())) {
+            transaction.commit();
+            return maybe_keyword;
+        }
+    }
 
     return nullptr;
 }
@@ -1235,10 +1244,10 @@ RefPtr<CSSStyleValue const> Parser::parse_rgb_color_value(TokenStream<ComponentV
     //                       rgb( <number>#{3} , <alpha-value>? )
     // <legacy-rgba-syntax> = rgba( <percentage>#{3} , <alpha-value>? ) |
     //                        rgba( <number>#{3} , <alpha-value>? )
-    // <modern-rgb-syntax> = rgb(
+    // <modern-rgb-syntax> = rgb( [ from <color> ]?
     //     [ <number> | <percentage> | none]{3}
     //     [ / [<alpha-value> | none] ]?  )
-    // <modern-rgba-syntax> = rgba(
+    // <modern-rgba-syntax> = rgba( [ from <color> ]?
     //     [ <number> | <percentage> | none]{3}
     //     [ / [<alpha-value> | none] ]?  )
 
@@ -1251,6 +1260,7 @@ RefPtr<CSSStyleValue const> Parser::parse_rgb_color_value(TokenStream<ComponentV
 
     auto context_guard = push_temporary_value_parsing_context(FunctionContext { function_token.function().name });
 
+    RefPtr<CSSStyleValue const> origin;
     RefPtr<CSSStyleValue const> red;
     RefPtr<CSSStyleValue const> green;
     RefPtr<CSSStyleValue const> blue;
@@ -1259,6 +1269,18 @@ RefPtr<CSSStyleValue const> Parser::parse_rgb_color_value(TokenStream<ComponentV
     auto inner_tokens = TokenStream { function_token.function().value };
     inner_tokens.discard_whitespace();
 
+    if (inner_tokens.next_token().is_ident("from"sv)) {
+        inner_tokens.discard_a_token();
+        inner_tokens.discard_whitespace();
+
+        origin = parse_color_value(inner_tokens);
+        if (!origin)
+            return {};
+        inner_tokens.discard_whitespace();
+        // Replace context_guard's pushed context
+        m_value_context.last() = RelativeColorContext { .component_keywords = { Keyword::R, Keyword::G, Keyword::B, Keyword::Alpha } };
+    }
+
     red = parse_number_percentage_none_value(inner_tokens);
     if (!red)
         return {};
@@ -1266,6 +1288,10 @@ RefPtr<CSSStyleValue const> Parser::parse_rgb_color_value(TokenStream<ComponentV
     inner_tokens.discard_whitespace();
     bool legacy_syntax = inner_tokens.next_token().is(Token::Type::Comma);
     if (legacy_syntax) {
+        // Relative color syntax only applies to the modern color syntax. It cannot be used with legacy color syntax and attempting to do so is an error.
+        if (origin)
+            return {};
+
         // Legacy syntax
         //   <percentage>#{3} , <alpha-value>?
         //   | <number>#{3} , <alpha-value>?
@@ -1345,7 +1371,7 @@ RefPtr<CSSStyleValue const> Parser::parse_rgb_color_value(TokenStream<ComponentV
         alpha = NumberStyleValue::create(1);
 
     transaction.commit();
-    return CSSRGB::create(red.release_nonnull(), green.release_nonnull(), blue.release_nonnull(), alpha.release_nonnull(), legacy_syntax ? ColorSyntax::Legacy : ColorSyntax::Modern);
+    return CSSRGB::create(red.release_nonnull(), green.release_nonnull(), blue.release_nonnull(), alpha.release_nonnull(), legacy_syntax ? ColorSyntax::Legacy : ColorSyntax::Modern, {}, origin);
 }
 
 // https://www.w3.org/TR/css-color-4/#funcdef-hsl
@@ -1995,13 +2021,15 @@ RefPtr<CSSStyleValue const> Parser::parse_color_value(TokenStream<ComponentValue
             quirky_color_allowed = m_value_context.first().visit(
                 [](PropertyID const& property_id) { return property_has_quirk(property_id, Quirk::HashlessHexColor); },
                 [](FunctionContext const&) { return false; },
-                [](DescriptorContext const&) { return false; });
+                [](DescriptorContext const&) { return false; },
+                [](RelativeColorContext const&) { return false; });
         }
         for (auto i = 1u; i < m_value_context.size() && quirky_color_allowed; i++) {
             quirky_color_allowed = m_value_context[i].visit(
                 [](PropertyID const& property_id) { return property_has_quirk(property_id, Quirk::HashlessHexColor); },
                 [](FunctionContext const&) { return false; },
-                [](DescriptorContext const&) { return false; });
+                [](DescriptorContext const&) { return false; },
+                [](RelativeColorContext const&) { return false; });
         }
         if (quirky_color_allowed) {
             // NOTE: This algorithm is no longer in the spec, since the concept got moved and renamed. However, it works,
@@ -3854,6 +3882,9 @@ RefPtr<CSSStyleValue const> Parser::parse_calculated_value(ComponentValue const&
             [](DescriptorContext const&) -> Optional<CalculationContext> {
                 // FIXME: If any descriptors have `<*-percentage>` or `<integer>` types, add them here.
                 return CalculationContext {};
+            },
+            [](RelativeColorContext const& context) -> Optional<CalculationContext> {
+                return CalculationContext { .component_keywords = context.component_keywords };
             });
         if (maybe_context.has_value()) {
             context = maybe_context.release_value();
@@ -3960,6 +3991,8 @@ RefPtr<CalculationNode const> Parser::convert_to_calculation_node(CalcParsing::N
                 auto maybe_keyword = keyword_from_string(component_value->token().ident());
                 if (!maybe_keyword.has_value())
                     return nullptr;
+                if (context.component_keywords.contains_slow(*maybe_keyword))
+                    return KeywordCalculationNode::create(*maybe_keyword, context);
                 return NumericCalculationNode::from_keyword(*maybe_keyword, context);
             }
 
