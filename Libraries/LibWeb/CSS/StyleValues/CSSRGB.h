@@ -14,13 +14,13 @@ namespace Web::CSS {
 // https://drafts.css-houdini.org/css-typed-om-1/#cssrgb
 class CSSRGB final : public CSSColorValue {
 public:
-    static ValueComparingNonnullRefPtr<CSSRGB const> create(ValueComparingNonnullRefPtr<CSSStyleValue const> r, ValueComparingNonnullRefPtr<CSSStyleValue const> g, ValueComparingNonnullRefPtr<CSSStyleValue const> b, ValueComparingRefPtr<CSSStyleValue const> alpha, ColorSyntax color_syntax, Optional<FlyString> name = {})
+    static ValueComparingNonnullRefPtr<CSSRGB const> create(ValueComparingNonnullRefPtr<CSSStyleValue const> r, ValueComparingNonnullRefPtr<CSSStyleValue const> g, ValueComparingNonnullRefPtr<CSSStyleValue const> b, ValueComparingRefPtr<CSSStyleValue const> alpha, ColorSyntax color_syntax, Optional<FlyString> name = {}, ValueComparingRefPtr<CSSStyleValue const> origin = {})
     {
         // alpha defaults to 1
         if (!alpha)
-            return adopt_ref(*new (nothrow) CSSRGB(move(r), move(g), move(b), NumberStyleValue::create(1), color_syntax, name));
+            return adopt_ref(*new (nothrow) CSSRGB(move(r), move(g), move(b), NumberStyleValue::create(1), color_syntax, name, origin));
 
-        return adopt_ref(*new (nothrow) CSSRGB(move(r), move(g), move(b), alpha.release_nonnull(), color_syntax, name));
+        return adopt_ref(*new (nothrow) CSSRGB(move(r), move(g), move(b), alpha.release_nonnull(), color_syntax, name, origin));
     }
     virtual ~CSSRGB() override = default;
 
@@ -36,9 +36,9 @@ public:
     virtual bool equals(CSSStyleValue const& other) const override;
 
 private:
-    CSSRGB(ValueComparingNonnullRefPtr<CSSStyleValue const> r, ValueComparingNonnullRefPtr<CSSStyleValue const> g, ValueComparingNonnullRefPtr<CSSStyleValue const> b, ValueComparingNonnullRefPtr<CSSStyleValue const> alpha, ColorSyntax color_syntax, Optional<FlyString> name = {})
+    CSSRGB(ValueComparingNonnullRefPtr<CSSStyleValue const> r, ValueComparingNonnullRefPtr<CSSStyleValue const> g, ValueComparingNonnullRefPtr<CSSStyleValue const> b, ValueComparingNonnullRefPtr<CSSStyleValue const> alpha, ColorSyntax color_syntax, Optional<FlyString> name = {}, ValueComparingRefPtr<CSSStyleValue const> origin = {})
         : CSSColorValue(ColorType::RGB, color_syntax)
-        , m_properties { .r = move(r), .g = move(g), .b = move(b), .alpha = move(alpha), .name = name }
+        , m_properties { .r = move(r), .g = move(g), .b = move(b), .alpha = move(alpha), .origin = move(origin), .name = name }
     {
     }
 
@@ -47,6 +47,7 @@ private:
         ValueComparingNonnullRefPtr<CSSStyleValue const> g;
         ValueComparingNonnullRefPtr<CSSStyleValue const> b;
         ValueComparingNonnullRefPtr<CSSStyleValue const> alpha;
+        ValueComparingRefPtr<CSSStyleValue const> origin;
         Optional<FlyString> name;
         bool operator==(Properties const&) const = default;
     } m_properties;

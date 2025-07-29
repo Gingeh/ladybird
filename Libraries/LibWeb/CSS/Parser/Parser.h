@@ -547,7 +547,10 @@ private:
         AtRuleID at_rule;
         DescriptorID descriptor;
     };
-    using ValueParsingContext = Variant<PropertyID, FunctionContext, DescriptorContext>;
+    struct RelativeColorContext {
+        Vector<Keyword> component_keywords;
+    };
+    using ValueParsingContext = Variant<PropertyID, FunctionContext, DescriptorContext, RelativeColorContext>;
     Vector<ValueParsingContext> m_value_context;
     auto push_temporary_value_parsing_context(ValueParsingContext&& context)
     {

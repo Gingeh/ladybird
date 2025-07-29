@@ -147,8 +147,17 @@ Optional<double> CSSColorValue::resolve_alpha(CSSStyleValue const& style_value, 
         }
     }
 
-    if (style_value.is_keyword() && style_value.to_keyword() == Keyword::None)
-        return 0;
+    if (style_value.is_keyword()) {
+        if (style_value.to_keyword() == Keyword::None)
+            return 0;
+
+        auto maybe_number = resolution_context.resolved_keyword_values.get(style_value.to_keyword());
+
+        if (!maybe_number.has_value())
+            return {};
+
+        return normalized(maybe_number.value());
+    }
 
     return 1;
 }
@@ -160,6 +169,10 @@ void CSSColorValue::serialize_color_component(StringBuilder& builder, Serializat
         return;
     }
     if (component.is_calculated() && mode == SerializationMode::Normal) {
+        builder.append(component.to_string(mode));
+        return;
+    }
+    if (component.is_keyword() && mode == SerializationMode::Normal) {
         builder.append(component.to_string(mode));
         return;
     }
