@@ -14,13 +14,13 @@ namespace Web::CSS {
 // https://drafts.css-houdini.org/css-typed-om-1/#csshwb
 class CSSHWB final : public CSSColorValue {
 public:
-    static ValueComparingNonnullRefPtr<CSSHWB const> create(ValueComparingNonnullRefPtr<CSSStyleValue const> h, ValueComparingNonnullRefPtr<CSSStyleValue const> w, ValueComparingNonnullRefPtr<CSSStyleValue const> b, ValueComparingRefPtr<CSSStyleValue const> alpha = {})
+    static ValueComparingNonnullRefPtr<CSSHWB const> create(ValueComparingNonnullRefPtr<CSSStyleValue const> h, ValueComparingNonnullRefPtr<CSSStyleValue const> w, ValueComparingNonnullRefPtr<CSSStyleValue const> b, ValueComparingRefPtr<CSSStyleValue const> alpha = {}, ValueComparingRefPtr<CSSStyleValue const> origin = {})
     {
         // alpha defaults to 1
         if (!alpha)
-            return adopt_ref(*new (nothrow) CSSHWB(move(h), move(w), move(b), NumberStyleValue::create(1)));
+            return adopt_ref(*new (nothrow) CSSHWB(move(h), move(w), move(b), NumberStyleValue::create(1), origin));
 
-        return adopt_ref(*new (nothrow) CSSHWB(move(h), move(w), move(b), alpha.release_nonnull()));
+        return adopt_ref(*new (nothrow) CSSHWB(move(h), move(w), move(b), alpha.release_nonnull(), origin));
     }
     virtual ~CSSHWB() override = default;
 
@@ -36,9 +36,9 @@ public:
     virtual bool equals(CSSStyleValue const& other) const override;
 
 private:
-    CSSHWB(ValueComparingNonnullRefPtr<CSSStyleValue const> h, ValueComparingNonnullRefPtr<CSSStyleValue const> w, ValueComparingNonnullRefPtr<CSSStyleValue const> b, ValueComparingNonnullRefPtr<CSSStyleValue const> alpha)
+    CSSHWB(ValueComparingNonnullRefPtr<CSSStyleValue const> h, ValueComparingNonnullRefPtr<CSSStyleValue const> w, ValueComparingNonnullRefPtr<CSSStyleValue const> b, ValueComparingNonnullRefPtr<CSSStyleValue const> alpha, ValueComparingRefPtr<CSSStyleValue const> origin = {})
         : CSSColorValue(ColorType::HWB, ColorSyntax::Modern)
-        , m_properties { .h = move(h), .w = move(w), .b = move(b), .alpha = move(alpha) }
+        , m_properties { .h = move(h), .w = move(w), .b = move(b), .alpha = move(alpha), .origin = move(origin) }
     {
     }
 
@@ -47,6 +47,7 @@ private:
         ValueComparingNonnullRefPtr<CSSStyleValue const> w;
         ValueComparingNonnullRefPtr<CSSStyleValue const> b;
         ValueComparingNonnullRefPtr<CSSStyleValue const> alpha;
+        ValueComparingRefPtr<CSSStyleValue const> origin;
         bool operator==(Properties const&) const = default;
     } m_properties;
 };

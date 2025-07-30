@@ -1506,7 +1506,7 @@ RefPtr<CSSStyleValue const> Parser::parse_hsl_color_value(TokenStream<ComponentV
 // https://www.w3.org/TR/css-color-4/#funcdef-hwb
 RefPtr<CSSStyleValue const> Parser::parse_hwb_color_value(TokenStream<ComponentValue>& outer_tokens)
 {
-    // hwb() = hwb(
+    // hwb() = hwb( [ from <color> ]?
     //     [<hue> | none]
     //     [<percentage> | <number> | none]
     //     [<percentage> | <number> | none]
@@ -1521,6 +1521,7 @@ RefPtr<CSSStyleValue const> Parser::parse_hwb_color_value(TokenStream<ComponentV
 
     auto context_guard = push_temporary_value_parsing_context(FunctionContext { function_token.function().name });
 
+    RefPtr<CSSStyleValue const> origin;
     RefPtr<CSSStyleValue const> h;
     RefPtr<CSSStyleValue const> w;
     RefPtr<CSSStyleValue const> b;
@@ -1528,6 +1529,18 @@ RefPtr<CSSStyleValue const> Parser::parse_hwb_color_value(TokenStream<ComponentV
 
     auto inner_tokens = TokenStream { function_token.function().value };
     inner_tokens.discard_whitespace();
+
+    if (inner_tokens.next_token().is_ident("from"sv)) {
+        inner_tokens.discard_a_token();
+        inner_tokens.discard_whitespace();
+
+        origin = parse_color_value(inner_tokens);
+        if (!origin)
+            return {};
+        inner_tokens.discard_whitespace();
+        // Replace context_guard's pushed context
+        m_value_context.last() = RelativeColorContext { .component_keywords = { Keyword::H, Keyword::W, Keyword::B, Keyword::Alpha } };
+    }
 
     h = parse_hue_none_value(inner_tokens);
     if (!h)
@@ -1554,7 +1567,7 @@ RefPtr<CSSStyleValue const> Parser::parse_hwb_color_value(TokenStream<ComponentV
         alpha = NumberStyleValue::create(1);
 
     transaction.commit();
-    return CSSHWB::create(h.release_nonnull(), w.release_nonnull(), b.release_nonnull(), alpha.release_nonnull());
+    return CSSHWB::create(h.release_nonnull(), w.release_nonnull(), b.release_nonnull(), alpha.release_nonnull(), origin);
 }
 
 Optional<Array<RefPtr<CSSStyleValue const>, 4>> Parser::parse_lab_like_color_value(TokenStream<ComponentValue>& outer_tokens, StringView function_name)
