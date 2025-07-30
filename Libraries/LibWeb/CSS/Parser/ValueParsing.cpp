@@ -1495,12 +1495,12 @@ RefPtr<CSSStyleValue const> Parser::parse_hsl_color_value(TokenStream<ComponentV
 {
     // hsl() = [ <legacy-hsl-syntax> | <modern-hsl-syntax> ]
     // hsla() = [ <legacy-hsla-syntax> | <modern-hsla-syntax> ]
-    // <modern-hsl-syntax> = hsl(
+    // <modern-hsl-syntax> = hsl( [ from <color> ]?
     //     [<hue> | none]
     //     [<percentage> | <number> | none]
     //     [<percentage> | <number> | none]
     //     [ / [<alpha-value> | none] ]? )
-    // <modern-hsla-syntax> = hsla(
+    // <modern-hsla-syntax> = hsla( [ from <color> ]?
     //     [<hue> | none]
     //     [<percentage> | <number> | none]
     //     [<percentage> | <number> | none]
@@ -1517,6 +1517,7 @@ RefPtr<CSSStyleValue const> Parser::parse_hsl_color_value(TokenStream<ComponentV
 
     auto context_guard = push_temporary_value_parsing_context(FunctionContext { function_token.function().name });
 
+    RefPtr<CSSStyleValue const> origin;
     RefPtr<CSSStyleValue const> h;
     RefPtr<CSSStyleValue const> s;
     RefPtr<CSSStyleValue const> l;
@@ -1525,6 +1526,18 @@ RefPtr<CSSStyleValue const> Parser::parse_hsl_color_value(TokenStream<ComponentV
     auto inner_tokens = TokenStream { function_token.function().value };
     inner_tokens.discard_whitespace();
 
+    if (inner_tokens.next_token().is_ident("from"sv)) {
+        inner_tokens.discard_a_token();
+        inner_tokens.discard_whitespace();
+
+        origin = parse_color_value(inner_tokens);
+        if (!origin)
+            return {};
+        inner_tokens.discard_whitespace();
+        // Replace context_guard's pushed context
+        m_value_context.last() = RelativeColorContext { .component_keywords = { Keyword::H, Keyword::S, Keyword::L, Keyword::Alpha } };
+    }
+
     h = parse_hue_none_value(inner_tokens);
     if (!h)
         return {};
@@ -1532,6 +1545,10 @@ RefPtr<CSSStyleValue const> Parser::parse_hsl_color_value(TokenStream<ComponentV
     inner_tokens.discard_whitespace();
     bool legacy_syntax = inner_tokens.next_token().is(Token::Type::Comma);
     if (legacy_syntax) {
+        // Relative color syntax only applies to the modern color syntax. It cannot be used with legacy color syntax and attempting to do so is an error.
+        if (origin)
+            return {};
+
         // Legacy syntax
         //   <hue>, <percentage>, <percentage>, <alpha-value>?
 
@@ -1599,7 +1616,7 @@ RefPtr<CSSStyleValue const> Parser::parse_hsl_color_value(TokenStream<ComponentV
         alpha = NumberStyleValue::create(1);
 
     transaction.commit();
-    return CSSHSL::create(h.release_nonnull(), s.release_nonnull(), l.release_nonnull(), alpha.release_nonnull(), legacy_syntax ? ColorSyntax::Legacy : ColorSyntax::Modern);
+    return CSSHSL::create(h.release_nonnull(), s.release_nonnull(), l.release_nonnull(), alpha.release_nonnull(), legacy_syntax ? ColorSyntax::Legacy : ColorSyntax::Modern, origin);
 }
 
 // https://www.w3.org/TR/css-color-4/#funcdef-hwb

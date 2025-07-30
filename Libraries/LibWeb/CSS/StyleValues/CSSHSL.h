@@ -14,13 +14,13 @@ namespace Web::CSS {
 // https://drafts.css-houdini.org/css-typed-om-1/#csshsl
 class CSSHSL final : public CSSColorValue {
 public:
-    static ValueComparingNonnullRefPtr<CSSHSL const> create(ValueComparingNonnullRefPtr<CSSStyleValue const> h, ValueComparingNonnullRefPtr<CSSStyleValue const> s, ValueComparingNonnullRefPtr<CSSStyleValue const> l, ValueComparingRefPtr<CSSStyleValue const> alpha, ColorSyntax color_syntax)
+    static ValueComparingNonnullRefPtr<CSSHSL const> create(ValueComparingNonnullRefPtr<CSSStyleValue const> h, ValueComparingNonnullRefPtr<CSSStyleValue const> s, ValueComparingNonnullRefPtr<CSSStyleValue const> l, ValueComparingRefPtr<CSSStyleValue const> alpha, ColorSyntax color_syntax, ValueComparingRefPtr<CSSStyleValue const> origin = {})
     {
         // alpha defaults to 1
         if (!alpha)
-            return adopt_ref(*new (nothrow) CSSHSL(move(h), move(s), move(l), NumberStyleValue::create(1), color_syntax));
+            return adopt_ref(*new (nothrow) CSSHSL(move(h), move(s), move(l), NumberStyleValue::create(1), color_syntax, origin));
 
-        return adopt_ref(*new (nothrow) CSSHSL(move(h), move(s), move(l), alpha.release_nonnull(), color_syntax));
+        return adopt_ref(*new (nothrow) CSSHSL(move(h), move(s), move(l), alpha.release_nonnull(), color_syntax, origin));
     }
     virtual ~CSSHSL() override = default;
 
@@ -36,9 +36,9 @@ public:
     virtual bool equals(CSSStyleValue const& other) const override;
 
 private:
-    CSSHSL(ValueComparingNonnullRefPtr<CSSStyleValue const> h, ValueComparingNonnullRefPtr<CSSStyleValue const> s, ValueComparingNonnullRefPtr<CSSStyleValue const> l, ValueComparingNonnullRefPtr<CSSStyleValue const> alpha, ColorSyntax color_syntax)
+    CSSHSL(ValueComparingNonnullRefPtr<CSSStyleValue const> h, ValueComparingNonnullRefPtr<CSSStyleValue const> s, ValueComparingNonnullRefPtr<CSSStyleValue const> l, ValueComparingNonnullRefPtr<CSSStyleValue const> alpha, ColorSyntax color_syntax, ValueComparingRefPtr<CSSStyleValue const> origin = {})
         : CSSColorValue(ColorType::HSL, color_syntax)
-        , m_properties { .h = move(h), .s = move(s), .l = move(l), .alpha = move(alpha) }
+        , m_properties { .h = move(h), .s = move(s), .l = move(l), .alpha = move(alpha), .origin = move(origin) }
     {
     }
 
@@ -47,6 +47,7 @@ private:
         ValueComparingNonnullRefPtr<CSSStyleValue const> s;
         ValueComparingNonnullRefPtr<CSSStyleValue const> l;
         ValueComparingNonnullRefPtr<CSSStyleValue const> alpha;
+        ValueComparingRefPtr<CSSStyleValue const> origin;
         bool operator==(Properties const&) const = default;
     } m_properties;
 };
