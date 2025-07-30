@@ -18,7 +18,7 @@ namespace Web::CSS {
 Optional<Color> CSSRGB::to_color(Optional<Layout::NodeWithStyle const&> node, CalculationResolutionContext const& resolution_context) const
 {
     auto component_resolution_context = resolution_context;
-    if (m_properties.origin) {
+    if (is_relative()) {
         auto resolved_origin = m_properties.origin->to_color(node, resolution_context);
         if (!resolved_origin.has_value())
             return {};
@@ -115,7 +115,7 @@ String CSSRGB::to_string(SerializationMode mode) const
         if (m_properties.name.has_value())
             return m_properties.name.value().to_string().to_ascii_lowercase();
 
-        if (m_properties.origin) {
+        if (is_relative()) {
             StringBuilder builder;
             builder.append("rgb(from "sv);
             builder.append(m_properties.origin->to_string(mode));
@@ -135,8 +135,26 @@ String CSSRGB::to_string(SerializationMode mode) const
         }
     }
 
-    if (auto color = to_color({}, {}); color.has_value())
+    if (auto color = to_color({}, {}); color.has_value()) {
+        if (is_relative()) {
+            StringBuilder builder;
+            builder.append("color(srgb "sv);
+            builder.appendff("{}", color->red() / 255.0);
+            builder.append(" "sv);
+            builder.appendff("{}", color->green() / 255.0);
+            builder.append(" "sv);
+            builder.appendff("{}", color->blue() / 255.0);
+            if (color->alpha() < 255) {
+                builder.append(" / "sv);
+                builder.appendff("{}", color->alpha() / 255.0);
+            }
+            builder.append(")"sv);
+
+            return builder.to_string_without_validation();
+        }
+
         return serialize_a_srgb_value(color.value());
+    }
 
     StringBuilder builder;
     builder.append("rgb("sv);
