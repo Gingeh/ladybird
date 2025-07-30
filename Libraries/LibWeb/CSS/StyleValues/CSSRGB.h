@@ -31,6 +31,8 @@ public:
 
     virtual Optional<Color> to_color(Optional<Layout::NodeWithStyle const&>, CalculationResolutionContext const&) const override;
 
+    virtual bool is_relative() const override { return m_properties.origin; }
+
     virtual String to_string(SerializationMode) const override;
 
     virtual bool equals(CSSStyleValue const& other) const override;

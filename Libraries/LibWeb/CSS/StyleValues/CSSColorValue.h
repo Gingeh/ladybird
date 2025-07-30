@@ -27,6 +27,8 @@ public:
     virtual ~CSSColorValue() override = default;
 
     virtual bool has_color() const override { return true; }
+    
+    virtual bool is_relative() const { return false; }
 
     enum class ColorType {
         RGB, // This is used by CSSRGB for rgb(...) and rgba(...).
